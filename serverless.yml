@@ -1,0 +1,51 @@
+service: ec2-bot
+
+plugins:
+  - serverless-plugin-common-excludes
+
+package:
+  exclude:
+    - .env.yml
+    - .eslintrc.json
+    - .prettierrc.json
+
+provider:
+  name: aws
+  stage: prod
+  region: ap-east-1
+  runtime: nodejs12.x
+  memorySize: 512
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - ec2:Describe*
+        - ec2:StartInstances
+        - ec2:StopInstances
+        - lambda:Invoke
+      Resource: '*'
+  environment:
+    API_GW_URL:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ApiGatewayRestApi
+          - .execute-api.
+          - ${self:provider.region}
+          - .amazonaws.com/
+          - ${self:provider.stage}
+    AUTHORIZED_IDS: ${ssm:/${self:service}/AUTHORIZED_IDS~true}
+    INSTANCE_ID: ${ssm:/${self:service}/INSTANCE_ID}
+    TG_BOT_TOKEN: ${ssm:/${self:service}/TG_BOT_TOKEN~true}
+
+functions:
+  webhook:
+    handler: lib.webhook
+    timeout: 240
+    events:
+      - http:
+          async: true
+          method: POST
+          path: /webhook
+
+  setWebhook:
+    handler: lib.setWebhook
